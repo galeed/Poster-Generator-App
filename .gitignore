@@ -6,6 +6,14 @@ _site/
 .sass-cache/
 .jekyll-cache/
 .jekyll-metadata
+node_modules/
+.env
+.env.local
+.env.*.local
+.vercel
+build/
+dist/
+
 
 # Additional Ruby/bundler ignore for when you run: bundle install
 /vendor
