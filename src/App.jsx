@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { AlbumSearch } from './components/AlbumSearch';
 import { PosterPreview } from './components/PosterPreview';
 
@@ -77,6 +78,7 @@ export default function App() {
           </div>
         )}
       </main>
+      <SpeedInsights />
     </div>
   );
 }
