@@ -1,3 +1,7 @@
+import React, { useState } from 'react';
+import { AlbumSearch } from './components/AlbumSearch.jsx';
+import { PosterPreview } from './components/PosterPreview.jsx';
+
 // En el método render de App.jsx, dentro del selector de estilos:
 <div className="grid grid-cols-2 gap-2">
   {[
