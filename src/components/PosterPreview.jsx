@@ -1,19 +1,42 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { toPng } from 'html-to-image';
 
 export const PosterPreview = ({ album, styleVariant }) => {
   const posterRef = useRef(null);
+  const [downloading, setDownloading] = useState(false);
 
   const handleExport = async () => {
-    if (!posterRef.current) return;
+    if (!posterRef.current || downloading) return;
+    setDownloading(true);
+
     try {
-      const dataUrl = await toPng(posterRef.current, { pixelRatio: 3 });
+      // Configuración robusta para evitar fallos por imágenes cross-origin de Spotify
+      const dataUrl = await toPng(posterRef.current, {
+        quality: 0.95,
+        pixelRatio: 2,
+        cacheBust: true,
+        style: {
+          transform: 'scale(1)',
+          transformOrigin: 'top left'
+        }
+      });
+
       const link = document.createElement('a');
-      link.download = `${album.name.replace(/\s+/g, '-').toLowerCase()}-poster.png`;
+      const cleanFileName = (album.name || 'poster')
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '-')
+        .replace(/-+/g, '-');
+
+      link.download = `${cleanFileName}-poster.png`;
       link.href = dataUrl;
+      document.body.appendChild(link);
       link.click();
+      document.body.removeChild(link);
     } catch (err) {
       console.error('Error al exportar poster:', err);
+      alert('Ocurrió un error al generar la imagen. Intenta de nuevo.');
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -21,70 +44,48 @@ export const PosterPreview = ({ album, styleVariant }) => {
   const tracks = album.tracks || [];
   const trackCount = tracks.length;
 
-  // 1. Configurar dinámicamente columnas y tamaños según la cantidad de canciones
-  const getTracklistLayout = () => {
-    if (trackCount > 22) {
-      return {
-        gridCols: 'grid-cols-3 gap-x-2 gap-y-[1px]',
-        textSize: 'text-[5.5px] leading-tight',
-        maxLimit: 30
-      };
+  // Cálculo inteligente de tamaño de fuente y columnas para que NUNCA se corten
+  const getTracklistConfig = () => {
+    if (trackCount > 20) {
+      return { cols: 'grid-cols-3 gap-x-2 gap-y-0.5', text: 'text-[6px] leading-[8px]' };
     }
-    if (trackCount > 14) {
-      return {
-        gridCols: 'grid-cols-2 gap-x-3 gap-y-[1px]',
-        textSize: 'text-[7px] leading-tight',
-        maxLimit: 24
-      };
+    if (trackCount > 12) {
+      return { cols: 'grid-cols-2 gap-x-3 gap-y-0.5', text: 'text-[7.5px] leading-[10px]' };
     }
-    if (trackCount > 8) {
-      return {
-        gridCols: 'grid-cols-2 gap-x-4 gap-y-0.5',
-        textSize: 'text-[8.5px] leading-snug',
-        maxLimit: 16
-      };
+    if (trackCount > 6) {
+      return { cols: 'grid-cols-2 gap-x-4 gap-y-1', text: 'text-[9px] leading-[12px]' };
     }
-    return {
-      gridCols: 'grid-cols-1 gap-y-1',
-      textSize: 'text-[9.5px] leading-normal',
-      maxLimit: 10
-    };
+    return { cols: 'grid-cols-1 gap-y-1.5', text: 'text-[10px] leading-[14px]' };
   };
 
-  // 2. Ajuste dinámico del título del álbum
-  const getTitleTextSize = () => {
-    if (album.name.length > 30) return 'text-sm';
-    if (album.name.length > 18) return 'text-base';
-    return 'text-lg';
-  };
-
-  const layout = getTracklistLayout();
+  const trackConfig = getTracklistConfig();
 
   return (
-    <div className="flex flex-col items-center gap-6">
-      {/* Contenedor del Poster */}
+    <div className="flex flex-col items-center gap-6 my-4">
+      {/* Contenedor con proporciones físicas de póster (380px x 570px) */}
       <div
         ref={posterRef}
-        className={`w-[380px] h-[570px] p-6 shadow-2xl transition-all duration-300 flex flex-col justify-between overflow-hidden relative ${getStyleClasses(styleVariant)}`}
+        id="poster-canvas"
+        className={`w-[380px] min-h-[570px] h-[570px] p-6 shadow-2xl transition-all duration-300 flex flex-col justify-between overflow-hidden relative ${getStyleClasses(styleVariant)}`}
       >
-        {/* Fondo Desenfoque Dinámico (Atmospheric) */}
+        {/* Fondo Atmosférico (Atmospheric Style) */}
         {isAtmospheric && (
-          <div className="absolute inset-0 z-0 overflow-hidden">
+          <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
             <img
               src={album.coverUrl}
               alt=""
               className="w-full h-full object-cover scale-150 blur-3xl opacity-50 saturate-200"
               crossOrigin="anonymous"
             />
-            <div className="absolute inset-0 bg-neutral-950/60 backdrop-blur-sm" />
+            <div className="absolute inset-0 bg-neutral-950/70 backdrop-blur-md" />
           </div>
         )}
 
-        {/* Contenido Principal */}
-        <div className="relative z-10 flex flex-col h-full justify-between">
-          {/* Header y Portada */}
-          <div>
-            <div className="w-full aspect-square overflow-hidden mb-3 shadow-2xl rounded-sm">
+        {/* Estructura Interna */}
+        <div className="relative z-10 flex flex-col h-full justify-between gap-2">
+          {/* Cabecera: Portada + Detalles del Álbum */}
+          <div className="flex-shrink-0">
+            <div className="w-full aspect-square overflow-hidden mb-3 shadow-xl rounded-sm bg-neutral-800">
               <img
                 src={album.coverUrl}
                 alt={album.name}
@@ -93,43 +94,46 @@ export const PosterPreview = ({ album, styleVariant }) => {
               />
             </div>
 
-            <div className="flex justify-between items-end border-b border-current/20 pb-1.5 mb-2">
+            <div className="flex justify-between items-end border-b border-current/20 pb-1.5 mb-1">
               <div className="max-w-[75%]">
-                <h2 className={`${getTitleTextSize()} font-extrabold uppercase tracking-tight leading-none truncate`}>
+                <h2 className="text-base font-extrabold uppercase tracking-tight leading-snug truncate">
                   {album.name}
                 </h2>
-                <p className="text-xs opacity-80 font-medium mt-1 truncate">{album.artist}</p>
+                <p className="text-xs opacity-80 font-medium truncate">{album.artist}</p>
               </div>
-              <span className="text-xs font-mono opacity-60 pb-0.5">{album.releaseYear}</span>
+              <span className="text-xs font-mono opacity-60 shrink-0">{album.releaseYear}</span>
             </div>
           </div>
 
-          {/* Tracklist Adaptativo Inteligente */}
-          <div className={`grid ${layout.gridCols} font-mono opacity-85 my-auto overflow-hidden ${layout.textSize}`}>
-            {tracks.slice(0, layout.maxLimit).map((track) => (
-              <div key={track.trackNumber} className="flex justify-between border-b border-current/10 pb-[1px]">
-                <span className="truncate pr-1">
-                  {track.trackNumber}. {track.name}
-                </span>
-                <span className="opacity-60 shrink-0">{track.duration}</span>
-              </div>
-            ))}
+          {/* Área Central: Lista de Pistas (Ajuste Flexible) */}
+          <div className="flex-1 flex items-center justify-center my-1 overflow-hidden">
+            <div className={`w-full grid ${trackConfig.cols} font-mono opacity-90 ${trackConfig.text}`}>
+              {tracks.map((track) => (
+                <div key={track.trackNumber} className="flex justify-between border-b border-current/10 pb-[1px] min-w-0">
+                  <span className="truncate pr-1">
+                    {track.trackNumber}. {track.name}
+                  </span>
+                  <span className="opacity-60 shrink-0">{track.duration}</span>
+                </div>
+              ))}
+            </div>
           </div>
 
-          {/* Pie de Poster */}
-          <div className="pt-2 border-t border-current/20 flex justify-between items-center text-[8px] font-mono opacity-60 mt-2">
-            <span className="truncate max-w-[60%]">{album.label || 'STEREO'}</span>
+          {/* Pie del Póster */}
+          <div className="flex-shrink-0 pt-1.5 border-t border-current/20 flex justify-between items-center text-[8px] font-mono opacity-60">
+            <span className="truncate max-w-[60%]">{album.label || 'STEREO RECORDING'}</span>
             <span>DURACIÓN: {album.totalDurationMinutes} MIN</span>
           </div>
         </div>
       </div>
 
-      {/* Botón de Descarga */}
+      {/* Botón Descargar PNG */}
       <button
         onClick={handleExport}
-        className="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black font-bold rounded-lg text-sm transition shadow-lg"
+        disabled={downloading}
+        className="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-400 disabled:bg-neutral-700 text-black font-bold rounded-lg text-sm transition shadow-lg"
       >
-        Descargar Poster (PNG)
+        {downloading ? 'Generando PNG...' : 'Descargar Poster (PNG)'}
       </button>
     </div>
   );
@@ -140,7 +144,7 @@ function getStyleClasses(variant) {
     case 'atmospheric':
       return 'bg-neutral-950 text-white border border-white/10';
     case 'clean-poster':
-      return 'bg-[#fcfbf9] text-[#111111] font-sans border-[10px] border-white shadow-2xl';
+      return 'bg-[#fcfbf9] text-[#111111] font-sans border-[12px] border-white shadow-2xl';
     case 'vinyl':
       return 'bg-[#e0d6c3] text-[#1a1a1a] font-serif border-4 border-[#1a1a1a]';
     case 'ticket':
