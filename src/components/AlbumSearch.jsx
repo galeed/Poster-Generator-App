@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useRef } from 'react';
+import { toPng } from 'html-to-image';
 
 export const AlbumSearch = ({ onSelectAlbum }) => {
   const [query, setQuery] = useState('');
