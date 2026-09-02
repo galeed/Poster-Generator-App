@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { toPng } from 'html-to-image';
+import html2canvas from 'html2canvas';
 
 export const PosterPreview = ({ album, styleVariant }) => {
   const posterRef = useRef(null);
@@ -10,65 +10,56 @@ export const PosterPreview = ({ album, styleVariant }) => {
     setDownloading(true);
 
     try {
-      // Configuración robusta para evitar fallos por imágenes cross-origin de Spotify
-      const dataUrl = await toPng(posterRef.current, {
-        quality: 0.95,
-        pixelRatio: 2,
-        cacheBust: true,
-        style: {
-          transform: 'scale(1)',
-          transformOrigin: 'top left'
-        }
+      const canvas = await html2canvas(posterRef.current, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: null,
+        logging: false
       });
 
-      const link = document.createElement('a');
-      const cleanFileName = (album.name || 'poster')
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, '-')
-        .replace(/-+/g, '-');
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          alert('Error al generar la imagen.');
+          setDownloading(false);
+          return;
+        }
 
-      link.download = `${cleanFileName}-poster.png`;
-      link.href = dataUrl;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+        const cleanFileName = (album.name || 'poster')
+          .toLowerCase()
+          .replace(/[^a-z0-9]/g, '-')
+          .replace(/-+/g, '-');
+
+        const blobUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = `${cleanFileName}-poster.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(blobUrl);
+        setDownloading(false);
+      }, 'image/png');
+
     } catch (err) {
       console.error('Error al exportar poster:', err);
-      alert('Ocurrió un error al generar la imagen. Intenta de nuevo.');
-    } finally {
+      alert('No se pudo procesar la descarga. Intenta de nuevo.');
       setDownloading(false);
     }
   };
 
   const isAtmospheric = styleVariant === 'atmospheric';
   const tracks = album.tracks || [];
-  const trackCount = tracks.length;
-
-  // Cálculo inteligente de tamaño de fuente y columnas para que NUNCA se corten
-  const getTracklistConfig = () => {
-    if (trackCount > 20) {
-      return { cols: 'grid-cols-3 gap-x-2 gap-y-0.5', text: 'text-[6px] leading-[8px]' };
-    }
-    if (trackCount > 12) {
-      return { cols: 'grid-cols-2 gap-x-3 gap-y-0.5', text: 'text-[7.5px] leading-[10px]' };
-    }
-    if (trackCount > 6) {
-      return { cols: 'grid-cols-2 gap-x-4 gap-y-1', text: 'text-[9px] leading-[12px]' };
-    }
-    return { cols: 'grid-cols-1 gap-y-1.5', text: 'text-[10px] leading-[14px]' };
-  };
-
-  const trackConfig = getTracklistConfig();
 
   return (
-    <div className="flex flex-col items-center gap-6 my-4">
-      {/* Contenedor con proporciones físicas de póster (380px x 570px) */}
+    <div className="flex flex-col items-center gap-6 my-4 w-full max-w-sm">
+      {/* Póster con altura adaptable min-h-[620px] */}
       <div
         ref={posterRef}
         id="poster-canvas"
-        className={`w-[380px] min-h-[570px] h-[570px] p-6 shadow-2xl transition-all duration-300 flex flex-col justify-between overflow-hidden relative ${getStyleClasses(styleVariant)}`}
+        className={`w-[380px] min-h-[620px] p-6 shadow-2xl transition-all duration-300 flex flex-col justify-between relative ${getStyleClasses(styleVariant)}`}
       >
-        {/* Fondo Atmosférico (Atmospheric Style) */}
+        {/* Fondo Atmosférico */}
         {isAtmospheric && (
           <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
             <img
@@ -81,9 +72,9 @@ export const PosterPreview = ({ album, styleVariant }) => {
           </div>
         )}
 
-        {/* Estructura Interna */}
-        <div className="relative z-10 flex flex-col h-full justify-between gap-2">
-          {/* Cabecera: Portada + Detalles del Álbum */}
+        {/* Contenido */}
+        <div className="relative z-10 flex flex-col h-full justify-between gap-4">
+          {/* Cabecera y Portada */}
           <div className="flex-shrink-0">
             <div className="w-full aspect-square overflow-hidden mb-3 shadow-xl rounded-sm bg-neutral-800">
               <img
@@ -94,22 +85,22 @@ export const PosterPreview = ({ album, styleVariant }) => {
               />
             </div>
 
-            <div className="flex justify-between items-end border-b border-current/20 pb-1.5 mb-1">
+            <div className="flex justify-between items-end border-b border-current/20 pb-2 mb-1">
               <div className="max-w-[75%]">
-                <h2 className="text-base font-extrabold uppercase tracking-tight leading-snug truncate">
+                <h2 className="text-lg font-extrabold uppercase tracking-tight leading-snug">
                   {album.name}
                 </h2>
-                <p className="text-xs opacity-80 font-medium truncate">{album.artist}</p>
+                <p className="text-xs opacity-80 font-medium">{album.artist}</p>
               </div>
               <span className="text-xs font-mono opacity-60 shrink-0">{album.releaseYear}</span>
             </div>
           </div>
 
-          {/* Área Central: Lista de Pistas (Ajuste Flexible) */}
-          <div className="flex-1 flex items-center justify-center my-1 overflow-hidden">
-            <div className={`w-full grid ${trackConfig.cols} font-mono opacity-90 ${trackConfig.text}`}>
+          {/* Tracklist Completo Dinámico */}
+          <div className="flex-1 my-2">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-[9px] leading-[12px] opacity-90">
               {tracks.map((track) => (
-                <div key={track.trackNumber} className="flex justify-between border-b border-current/10 pb-[1px] min-w-0">
+                <div key={track.trackNumber} className="flex justify-between border-b border-current/10 pb-[2px] min-w-0">
                   <span className="truncate pr-1">
                     {track.trackNumber}. {track.name}
                   </span>
@@ -119,19 +110,19 @@ export const PosterPreview = ({ album, styleVariant }) => {
             </div>
           </div>
 
-          {/* Pie del Póster */}
-          <div className="flex-shrink-0 pt-1.5 border-t border-current/20 flex justify-between items-center text-[8px] font-mono opacity-60">
+          {/* Pie de Página */}
+          <div className="flex-shrink-0 pt-2 border-t border-current/20 flex justify-between items-center text-[8px] font-mono opacity-60">
             <span className="truncate max-w-[60%]">{album.label || 'STEREO RECORDING'}</span>
             <span>DURACIÓN: {album.totalDurationMinutes} MIN</span>
           </div>
         </div>
       </div>
 
-      {/* Botón Descargar PNG */}
+      {/* Botón de Descarga */}
       <button
         onClick={handleExport}
         disabled={downloading}
-        className="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-400 disabled:bg-neutral-700 text-black font-bold rounded-lg text-sm transition shadow-lg"
+        className="w-full max-w-[380px] py-3 bg-emerald-500 hover:bg-emerald-400 disabled:bg-neutral-700 text-black font-bold rounded-lg text-sm transition shadow-lg"
       >
         {downloading ? 'Generando PNG...' : 'Descargar Poster (PNG)'}
       </button>
