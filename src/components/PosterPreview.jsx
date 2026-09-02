@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { toPng } from 'html-to-image';
+
 
 export const PosterPreview = ({ album, styleVariant }) => {
   const posterRef = useRef(null);
