@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import { AlbumSearch } from './components/AlbumSearch.jsx';
 import { PosterPreview } from './components/PosterPreview.jsx';
 
@@ -24,8 +25,10 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-white flex flex-col md:flex-row">
-      <aside className="w-full md:w-96 p-6 border-b md:border-b-0 md:border-r border-neutral-800 flex flex-col gap-6">
+    <>
+      <Analytics />
+      <div className="min-h-screen bg-neutral-950 text-white flex flex-col md:flex-row">
+        <aside className="w-full md:w-96 p-6 border-b md:border-b-0 md:border-r border-neutral-800 flex flex-col gap-6">
         <div>
           <h1 className="text-xl font-bold tracking-wide">Poster Generator</h1>
           <p className="text-xs text-neutral-400">Busca un álbum y elige una plantilla.</p>
@@ -75,5 +78,6 @@ export default function App() {
         )}
       </main>
     </div>
+    </>
   );
 }
